@@ -1,0 +1,7 @@
+---
+    backend_server:  localhost:8080
+    nginx_cache_dir: /var/nginx/cache
+    nginx_url: http://nginx.org/download/nginx-1.9.9.tar.gz
+    naxsi_url: https://github.com/nbs-system/naxsi/archive/master.zip
+    nginx_tar: nginx-1.9.9.tar.gz
+    naxsi_zip: naxsi-master.zip

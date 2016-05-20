@@ -1,0 +1,115 @@
+---
+    - hosts: naxsi
+      become: yes
+
+      vars_files:
+       - ../vars.yml
+
+      tasks:
+       - name: install the 'Development tools' package group
+         apt: name="{{ item }}" state=present
+         with_items:
+             - build-essential
+             - libpcre3
+             - libpcre3-dev
+             - openssl
+             - libssl-dev
+             - unzip
+
+       - name: download nginx
+         get_url: url={{ nginx_url }} dest=/usr/local/src
+
+       - name: Download naxsi source
+         get_url: url={{ naxsi_url }} dest=/usr/local/src
+
+       - name: Uncompressing nginx archive
+         command: tar xzf {{ nginx_tar }}
+         args:
+            chdir: /usr/local/src
+            creates: "/usr/local/src/nginx-1.9.9"
+
+       - name: Uncompressing naxsi archive
+         command: unzip {{ naxsi_zip }}
+         args:
+             chdir: /usr/local/src
+             creates: "/usr/local/src/naxsi-master"
+
+       - name: Compile nginx and naxsi
+         command: chdir=/usr/local/src/nginx-1.9.9 {{ item }}
+         args:
+             creates: /usr/sbin/nginx
+         with_items:
+            -  ./configure --prefix=/etc/nginx
+                         --sbin-path=/usr/sbin/nginx
+                         --conf-path=/etc/nginx/nginx.conf
+                         --add-module=../naxsi-master/naxsi_src/
+                         --error-log-path=/var/log/nginx/error.log
+                         --http-log-path=/var/log/nginx/access.log
+                         --pid-path=/var/run/nginx.pid
+                         --lock-path=/var/run/nginx.lock
+                         --http-client-body-temp-path=/var/cache/nginx/client_temp
+                         --http-proxy-temp-path=/var/cache/nginx/proxy_temp
+                         --http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp
+                         --http-uwsgi-temp-path=/var/cache/nginx/uwsgi_temp
+                         --http-scgi-temp-path=/var/cache/nginx/scgi_temp
+                         --user=nginx
+                         --group=nginx
+                         --with-http_ssl_module
+                         --with-http_realip_module
+                         --with-http_addition_module
+                         --with-http_sub_module
+                         --with-http_dav_module
+                         --with-http_flv_module
+                         --with-http_mp4_module
+                         --with-http_gunzip_module
+                         --with-http_gzip_static_module
+                         --with-http_random_index_module
+                         --with-http_secure_link_module
+                         --with-http_stub_status_module
+                         --with-http_auth_request_module
+                         --with-mail
+                         --with-mail_ssl_module
+                         --with-file-aio
+                         --with-ipv6
+                         --with-cc-opt='-O2 -g -pipe -Wp,-D_FORTIFY_SOURCE=2 -fexceptions -fstack-protector
+                         --param=ssp-buffer-size=4 -m64 -mtune=generic'
+            - make
+            - make install
+
+       - name: create nginx cache directory
+         file: path={{ nginx_cache_dir }} state=directory
+         
+       - name: Copy nginx init file
+         template:
+            src: nginx.init.j2
+            dest: /etc/init.d/nginx
+            owner: root
+            group: root
+            mode: 0755
+
+       - name: Copy naxsi.rules
+         template:
+            src: naxsi.rules.j2
+            dest: /etc/nginx/naxsi.rules
+            owner: root
+            group: root
+            mode: 0644
+
+       - name: Copy ngingx.conf
+         template:
+            src: nginx.conf.j2
+            dest: /etc/nginx/nginx.conf
+            owner: root
+            group: root
+            mode: 0644
+
+       - name: Copy naxsi_core.rules file (customized)
+         template:
+            src: naxsi_core.rules.j2
+            dest: /etc/nginx/naxsi_core.rules
+            owner: root
+            group: root
+            mode: 0644
+
+       - name: Ensure nginx is started and enabled to start at boot.
+         service: name=nginx state=started enabled=yes

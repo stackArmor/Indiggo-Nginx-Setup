@@ -1,0 +1,47 @@
+ user                nginx;
+ worker_processes    1;
+ worker_rlimit_core  500M;
+ working_directory   /tmp/;
+ error_log           /var/log/nginx/error.log;
+ pid                 /var/run/nginx.pid;
+
+ events {
+     worker_connections 1024;
+     use epoll;
+ }
+
+ http {
+     include                        /etc/nginx/naxsi_core.rules;
+     include                        /etc/nginx/mime.types;
+     server_names_hash_bucket_size  128;
+     sendfile                       on;
+     keepalive_timeout              65;
+     tcp_nodelay                    on;
+     gzip                           on;
+     gzip_disable                   "MSIE [1-6]\.(?!.*SV1)";
+
+    server {
+      listen            80;
+      server_name       {{ ansible_hostname }}:80;
+      access_log        /var/log/nginx/nginx_access.log;
+      error_log         /var/log/nginx/nginx_error.log debug;
+
+      location / {
+         include           /etc/nginx/naxsi.rules;
+         proxy_pass http://{{ backend_server }};
+         proxy_set_header Host $host;
+         proxy_set_header X-Real-IP $remote_addr;
+         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+         proxy_http_version 1.1;
+         proxy_set_header Connection "";
+         proxy_buffering off;
+         client_max_body_size 0;
+         proxy_read_timeout 36000s;
+         proxy_redirect off;
+      }
+
+      location /RequestDenied {
+        return 418 "The page you are looking for is administratively blocked.  Please contact the site adminisrator for details.";
+      }
+    }
+}
